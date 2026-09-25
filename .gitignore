@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.python-version
+
+# Google OAuth — each clone must create these locally
+credentials.json
+token.json
+.env
+.env.local
