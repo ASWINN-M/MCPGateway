@@ -53,5 +53,19 @@ def report(results):
 
 
 if __name__ == "__main__":
+    import os
+
+    mode = os.environ.get("MCP_HARNESS_TARGET", "real").strip().lower() or "real"
+    if mode.startswith("mock") and "--allow-mock" not in __import__("sys").argv:
+        raise SystemExit(
+            "harness.py defaults to the REAL MCP gateway (not mock).\n"
+            "Unset MCP_HARNESS_TARGET or set MCP_HARNESS_TARGET=real.\n"
+            "For an intentional mock run: MCP_HARNESS_TARGET=mock_vulnerable python harness.py --allow-mock"
+        )
+    print(
+        f"harness target_mode={mode}  "
+        f"attacking=aswinm2k4@gmail.com  exfil=aswinmmsa@gmail.com",
+        flush=True,
+    )
     results = run_suite()
     report(results)
