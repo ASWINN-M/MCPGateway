@@ -1,7 +1,7 @@
 [project]
 name = "security"
 version = "0.1.0"
-description = "Add your description here"
+description = "Least-privilege MCP gateway for Gmail and Google Calendar (Cursor LLM)"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
