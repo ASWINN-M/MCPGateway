@@ -13,21 +13,14 @@ from mcp.server.mcpserver import MCPServer
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from attachments import store_literal_attachment
-from gateway import (
-    ALLOWED_TOOLS,
-    advance_execution_lock,
-    authorize_session_tool,
-    caller_auth_error,
-    check_execution_lock,
-    consume_execution_token,
-    current_session_id,
-    describe_allowed_tools,
-    issue_confirmation,
-    issue_execution_token,
-    load_pending,
-    verify_execution_token,
-)
-from policy import describe_resource, format_identity, resolve_identity
+from phase1.identity_manager import format_identity, resolve_identity
+from phase1.permission_manager import describe_resource
+from phase1.tool_selector import describe_allowed_tools
+from phase2.approval_manager import advance_execution_lock, issue_confirmation, load_pending
+from phase2.authorization import ALLOWED_TOOLS
+from phase2.enforcement import enforce_tool_request
+from phase2.session_manager import current_session_id
+from phase2.token_validator import consume_execution_token, issue_execution_token
 
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly",
@@ -102,11 +95,6 @@ def get_calendar_service():
     return _calendar_service
 
 
-def _guard_caller() -> str | None:
-    """Block every tool when the local process is not an authenticated MCP client."""
-    return caller_auth_error()
-
-
 def _authenticated_user() -> str:
     """Mailbox identity from Google. This is not the local MCP caller token."""
     global _cached_user_email
@@ -121,41 +109,26 @@ def _authenticated_user() -> str:
 
 
 def _guard_tool(tool: str, fields: dict | None = None) -> str | None:
-    """Caller auth, trusted department policy, then the execution lock."""
-    denied = _guard_caller()
-    if denied:
-        return denied
+    """Phase 2 enforcement (+ Phase 3 audit) before any tool body runs."""
     try:
         user = _authenticated_user()
     except Exception as exc:
         return f"Blocked: could not verify the authenticated user ({exc})."
-    denied = authorize_session_tool(user, tool, fields or {})
-    if denied:
-        return denied
-    return check_execution_lock(tool, fields or {}, session=current_session_id())
+    return enforce_tool_request(tool=tool, fields=fields or {}, user_email=user)
 
 
 def _verify_protected(action: str, fields: dict, execution_token: str) -> str | None:
-    """Check caller auth, department policy, execution lock, then the execution token."""
-    denied = _guard_tool(action, fields)
-    if denied:
-        return denied
-    presented = str(execution_token or "").strip().lower()
-    if len(presented) != 64:
-        return "Blocked: protected action requires an execution token. A plan id is not enough."
-    session = current_session_id()
-    if not session:
-        return "Blocked: no authenticated session for this execution token."
+    """Phase 2 enforcement for high-risk tools (includes execution token check)."""
     try:
         user = _authenticated_user()
     except Exception as exc:
         return f"Blocked: could not verify the authenticated user ({exc})."
-    return verify_execution_token(
-        presented,
-        user=user,
-        session=session,
-        action=action,
+    return enforce_tool_request(
+        tool=action,
         fields=fields,
+        user_email=user,
+        execution_token=execution_token,
+        require_execution_token=True,
     )
 
 

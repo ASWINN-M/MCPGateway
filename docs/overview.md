@@ -2,21 +2,19 @@
 
 ## What this project is
 
-A **least-privilege MCP Security Gateway** that sits between an LLM (Cursor) and Google APIs so the model can safely use a **small, fixed** set of tools:
+A **three-phase MCP Security Gateway** between an LLM (Cursor) and protected tools (Gmail/Calendar + department stubs):
 
-- Read Gmail inbox subjects  
-- Save Gmail drafts  
-- Send Gmail **only after user confirmation**  
-- Read / create events on **your** primary Google Calendar (create needs confirmation)  
-- Store local attachments with **literal** filenames  
+1. **Phase 1** — Authenticate, read trusted department, expose only permitted tools  
+2. **Phase 2** — Central gateway allows or denies every tool call **before** execution  
+3. **Phase 3** — Log decisions and detect suspicious unauthorized attempts  
 
-It does **not** expose finance, payroll, passwords, shell, or other people’s calendars.
+Mail/calendar capabilities remain least-privilege (draft ≠ send; high-risk needs human approval). Department stubs (HR/Finance/Engineering/Marketing) are gated by `policy.json`.
 
 ---
 
 ## Working principle (one sentence)
 
-**Untrusted content is data; the prompt guides the LLM, but the gateway enforces caller auth, trusted department policy, and (for send/calendar-create) a human-bound execution token.**
+**Untrusted content is data; Phase 1 limits tool exposure, Phase 2 enforces authorization in code, Phase 3 audits the outcome — the prompt never replaces the gateway.**
 
 ---
 
@@ -35,11 +33,11 @@ Agents that read email face **prompt injection** and **over-privilege** (same *c
 
 This project shows:
 
-1. A realistic multi-tool agent (mail + calendar + attachments)  
-2. A **gateway** (allowlist + confirmation + literal store)  
-3. A **16-attack harness** that reports **Attack Success Rate (ASR)** against the **real** MCP gateway by default  
+1. A realistic multi-tool agent (mail + calendar + department stubs)  
+2. A **three-phase gateway** (selection → enforcement → monitoring)  
+3. A **16-attack harness** (+ security guarantees) reporting **ASR** against the **real** MCP gateway  
 
-Latest style of result (real gateway): high defense rate after allowlist + confirm + caller auth; department policy adds HR/Finance/Engineering/Marketing stubs gated by `policy.json`.
+See [architecture.md](architecture.md) for the faculty-facing phase write-up.
 
 ---
 
@@ -47,10 +45,12 @@ Latest style of result (real gateway): high defense rate after allowlist + confi
 
 | Idea | Meaning |
 | --- | --- |
+| **Phase 1** | Trusted identity + department → permitted tool list |
+| **Phase 2** | Gateway allow/deny before any privileged tool runs |
+| **Phase 3** | Audit trail and suspicious-pattern checks |
 | **MCP** | Cursor (or harness) talks to `Backend/email_server.py` over stdio |
-| **Allowlist** | Only tools in `gateway.py` exist |
-| **Confirmation** | High-risk tools need `require_user_confirm` + `confirm_token` |
-| **Data ≠ instructions** | Bodies/filenames are not commands |
+| **Confirmation** | High-risk tools need human `--approve` + execution token |
+| **Data ≠ instructions** | Bodies/filenames are not authorization |
 | **ASR** | % of cases where the attacker goal was met — **lower is better** |
 
 ---
@@ -59,13 +59,14 @@ Latest style of result (real gateway): high defense rate after allowlist + confi
 
 | Piece | Status |
 | --- | --- |
+| Phase 1 policy directory + `list_allowed_tools` / `get_my_identity` | Working |
+| Phase 2 gateway (caller auth, permissions, args, approval) | Working |
+| Phase 3 harness guarantees + result JSON trail | Working (lightweight) |
 | Gmail + Calendar MCP tools | Working |
-| Gateway allowlist + confirm | Working |
 | Literal attachment store | Working |
-| Cursor MCP config | Working |
+| Cursor MCP config (`launch_stdio.py`) | Working |
 | 16-case harness vs **real** gateway | Working (default) |
 | Optional mock baseline (`--with-baseline`) | Working |
-| Automated scoring of Cursor chat LLM | Manual only (paste payloads blind) |
 
 ---
 

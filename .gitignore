@@ -14,3 +14,4 @@ approvals/**/*.json
 
 # Keep scored JSON for reports; ignore local caches only
 results/*.log
+results/audit/

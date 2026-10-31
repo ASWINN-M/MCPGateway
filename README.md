@@ -4,7 +4,7 @@ Least-privilege MCP bridge between **Cursor’s LLM** and **Gmail + Google Calen
 
 The model can read mail, save drafts, send mail (with confirmation), check your calendar, create events on **your** calendar only (with confirmation), and store attachments as **literal** filenames. Finance, payroll, passwords, and shell access are not exposed.
 
-**Working principle:** untrusted content is data; privileged actions need an allowlisted tool and, for send/calendar-create, a human confirm token.
+**Working principle:** three phases — (1) expose only department-permitted tools, (2) gateway allow/deny before execution, (3) audit and detect abuse. The prompt guides; the gateway enforces.
 
 | Role | Address |
 | --- | --- |
@@ -19,7 +19,7 @@ The model can read mail, save drafts, send mail (with confirmation), check your 
 | --- | --- |
 | [docs/overview.md](docs/overview.md) | What / why / principles |
 | [docs/setup.md](docs/setup.md) | Clone → OAuth → Cursor |
-| [docs/architecture.md](docs/architecture.md) | System architecture + working principles |
+| [docs/architecture.md](docs/architecture.md) | Three-phase architecture (selection → enforcement → monitoring) |
 | [docs/tools-and-usage.md](docs/tools-and-usage.md) | Tools, CLI, chat |
 | [docs/testing.md](docs/testing.md) | 16-attack harness |
 | [docs/scores_real_gateway.md](docs/scores_real_gateway.md) | Latest real ASR |
@@ -95,21 +95,35 @@ Optional mock baseline: `python compare_before_after.py --with-baseline`
 
 ---
 
+## Explainer UI (for demos / faculty)
+
+Shows Phase 1–3 principles with a live allow/deny playground (uses `policy.json`; does not send real mail):
+
+```powershell
+cd C:\Capstone\Security
+.\.venv\Scripts\python.exe frontend\server.py
+```
+
+Open http://127.0.0.1:8760
+
 ## Layout
 
 ```text
 Security/
   README.md
-  docs/                     architecture, testing, scores, …
+  docs/                     three-phase architecture, testing, scores
+  frontend/                 visitor explainer UI + local server
   Backend/
-    email_server.py         MCP entry
-    gateway.py              allowlist + confirm
-    attachments.py          literal file store
-  testcases/extracted/      16-attack harness (real by default)
-  results/                  JSON scores
+    phase1/                 identity, permissions, tool selection
+    phase2/                 session, tokens, approval, enforcement
+    phase3/                 audit log, anomaly detection, monitoring
+    email_server.py         MCP tool surface
+    launch_stdio.py
+    policy.json
+    gateway.py / policy.py  compatibility shims
+  testcases/extracted/      16-attack harness + guarantees
+  results/                  scores + audit/
   .cursor/mcp.json
-  credentials.json          gitignored
-  token.json                gitignored (x2k4 session)
 ```
 
 ---
