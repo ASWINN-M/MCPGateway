@@ -27,8 +27,14 @@ ALLOWED_TOOLS = [
     "file_write_sandbox",
     "slack_post_message",
     "payment_transfer",
+    "fetch_finance_records",
+    "run_shell",
     "run_shell_command",
+    "run_command",
+    "export_secrets",
     "export_env_secrets",
+    "dump_env",
+    "render_template",
     "admin_grant_role",
 ]
 
@@ -36,6 +42,7 @@ HIGH_RISK_TOOLS = frozenset(
     {
         "send_email",
         "create_calendar_event",
+        "create_email_draft",
         "db_insert",
         "file_write_sandbox",
         "slack_post_message",
@@ -44,11 +51,17 @@ HIGH_RISK_TOOLS = frozenset(
 )
 
 _SEND_FIELDS = ("to_address", "subject", "body")
+_DRAFT_FIELDS = ("to_address", "subject", "body")
 _EVENT_FIELDS = ("title", "start", "end")
 _DB_INSERT_FIELDS = ("table", "row_json")
 _FILE_WRITE_FIELDS = ("path", "content")
 _SLACK_FIELDS = ("channel", "text")
 _PAYMENT_FIELDS = ("from_account", "to_account", "amount")
+
+# Per-session counters for volume abuse defenses (Phase 2).
+_SESSION_READ_COUNTS: dict[str, int] = {}
+MAIL_READ_RATE_LIMIT = 20
+DB_QUERY_MAX_LIMIT = 20
 _PLAN_ID_RE = re.compile(r"^[0-9a-f]{16}$")
 _EXECUTION_TOKEN_RE = re.compile(r"^[0-9a-f]{64}$")
 _DEFAULT_TTL_SECONDS = 600
@@ -150,6 +163,8 @@ def authorize_session_tool(user_email: str, tool: str, fields: dict | None = Non
 def _required_fields(action: str) -> tuple[str, ...] | None:
     if action == "send_email":
         return _SEND_FIELDS
+    if action == "create_email_draft":
+        return _DRAFT_FIELDS
     if action == "create_calendar_event":
         return _EVENT_FIELDS
     if action == "db_insert":
@@ -160,6 +175,26 @@ def _required_fields(action: str) -> tuple[str, ...] | None:
         return _SLACK_FIELDS
     if action == "payment_transfer":
         return _PAYMENT_FIELDS
+    return None
+
+
+def check_volume_limits(tool: str, fields: dict | None, *, session: str) -> str | None:
+    """Block runaway allowed-tool volume (TC-19 style abuse)."""
+    if tool != "read_latest_emails":
+        return None
+    sid = session or "anonymous"
+    used = _SESSION_READ_COUNTS.get(sid, 0)
+    requested = 1
+    try:
+        requested = max(1, int((fields or {}).get("count") or 1))
+    except (TypeError, ValueError):
+        requested = 1
+    if used + requested > MAIL_READ_RATE_LIMIT:
+        return (
+            f"Blocked: session mailbox read budget exceeded "
+            f"({MAIL_READ_RATE_LIMIT} reads/session). Phase 2 rate limit."
+        )
+    _SESSION_READ_COUNTS[sid] = used + requested
     return None
 
 

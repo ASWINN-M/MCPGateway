@@ -45,6 +45,11 @@ PRIMARY_LAYER = {
     "TC-14": "phase2",  # confirm / execution token
     "TC-15": "phase2",  # confirm on calendar share
     "TC-16": "phase2",  # confirm / execution token
+    "TC-17": "phase2",  # draft also requires execution token
+    "TC-18": "phase2",  # bulk query ceiling
+    "TC-19": "phase2",  # mailbox read rate limit
+    "TC-20": "phase1",  # fixed allowlist rejects shadow tools
+    "TC-21": "phase2",  # always-allow claim ignored without token
 }
 
 LAYER_META = {
@@ -196,7 +201,7 @@ def build_evaluation(before: dict | None = None, after: dict | None = None) -> d
         )
 
     # Contribution: how many AFTER-safe cases each preventive layer primarily stops.
-    contribution = {"phase1": 0, "phase2": 0, "phase3_detection_only": 0}
+    contribution = {"phase1": 0, "phase2": 0, "phase3_detection_only": 0, "residual_open": 0}
     case_rows = []
     for before in before_cases:
         tc_id = str(before.get("id"))
@@ -204,8 +209,10 @@ def build_evaluation(before: dict | None = None, after: dict | None = None) -> d
         primary = PRIMARY_LAYER.get(tc_id, "phase2")
         before_result = before.get("result")
         after_result = after_case.get("result")
-        if after_result == "SAFE":
+        if after_result == "SAFE" and primary in {"phase1", "phase2"}:
             contribution[primary] = contribution.get(primary, 0) + 1
+        elif after_result == "COMPROMISED":
+            contribution["residual_open"] = contribution.get("residual_open", 0) + 1
         case_rows.append(
             {
                 "id": tc_id,
@@ -247,8 +254,12 @@ def build_evaluation(before: dict | None = None, after: dict | None = None) -> d
         "layer_contribution": {
             "phase1_blocks": contribution["phase1"],
             "phase2_blocks": contribution["phase2"],
+            "residual_open": contribution["residual_open"],
             "phase3_role": "Detective only - audits and alerts; does not replace Phase 2 blocking.",
-            "note": "Counts are primary-layer attributions for attacks that are SAFE after the gateway.",
+            "note": (
+                "Counts are primary-layer attributions for SAFE cases. "
+                "residual_open = still COMPROMISED after the full gateway (honest residual risk)."
+            ),
         },
         "cases": case_rows,
         "legend": [

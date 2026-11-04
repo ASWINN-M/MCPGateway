@@ -19,6 +19,7 @@
         "mail:use",
         "calendar:use",
         "finance:read_reports",
+        "finance:fetch_payroll",
         "db:list",
         "db:read",
         "db:write",
@@ -103,8 +104,14 @@
     "file_write_sandbox": "files:write",
     "slack_post_message": "comms:post",
     "payment_transfer": "finance:transfer",
+    "fetch_finance_records": "finance:fetch_payroll",
+    "run_shell": "danger:shell",
     "run_shell_command": "danger:shell",
+    "run_command": "danger:shell",
+    "export_secrets": "danger:secrets",
     "export_env_secrets": "danger:secrets",
+    "dump_env": "danger:secrets",
+    "render_template": "danger:template",
     "admin_grant_role": "admin:roles"
   },
   "resources": {

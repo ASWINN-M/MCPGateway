@@ -14,8 +14,14 @@ _SENSITIVE = frozenset(
         "file_write_sandbox",
         "slack_post_message",
         "payment_transfer",
+        "fetch_finance_records",
+        "run_shell",
         "run_shell_command",
+        "run_command",
+        "export_secrets",
         "export_env_secrets",
+        "dump_env",
+        "render_template",
         "admin_grant_role",
     }
 )

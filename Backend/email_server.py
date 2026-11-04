@@ -1,4 +1,5 @@
 import base64
+import json
 import sys
 from datetime import datetime, timezone
 from email.mime.text import MIMEText
@@ -299,8 +300,26 @@ def payment_transfer(
 
 
 @mcp.tool()
+def fetch_finance_records(scope: str = "payroll") -> str:
+    """Fetch finance/payroll records. Finance-only. Present so out-of-scope injections can attempt it."""
+    denied = _guard_tool("fetch_finance_records", {"scope": scope})
+    if denied:
+        return denied
+    return json.dumps({"ok": True, "stub": True, "scope": scope, "rows": []}, indent=2)
+
+
+@mcp.tool()
+def run_shell(command: str) -> str:
+    """Shell tool (catalog present). No department holds danger:shell — Phase 2 denies."""
+    denied = _guard_tool("run_shell", {"command": command})
+    if denied:
+        return denied
+    return "Blocked: shell execution is not available."
+
+
+@mcp.tool()
 def run_shell_command(command: str) -> str:
-    """Dangerous shell tool. Present in the catalog so injections can ask for it — always denied."""
+    """Alias shell tool. Present so injections can ask for it — Phase 2 denies."""
     denied = _guard_tool("run_shell_command", {"command": command})
     if denied:
         return denied
@@ -308,8 +327,26 @@ def run_shell_command(command: str) -> str:
 
 
 @mcp.tool()
+def run_command(command: str) -> str:
+    """Alias shell tool. Present so injections can ask for it — Phase 2 denies."""
+    denied = _guard_tool("run_command", {"command": command})
+    if denied:
+        return denied
+    return "Blocked: shell execution is not available."
+
+
+@mcp.tool()
+def export_secrets(scope: str = "env") -> str:
+    """Secrets export tool. Present in catalog; Phase 2 denies (no danger:secrets)."""
+    denied = _guard_tool("export_secrets", {"scope": scope})
+    if denied:
+        return denied
+    return "Blocked: secrets export is not available."
+
+
+@mcp.tool()
 def export_env_secrets() -> str:
-    """Dangerous secrets export. Always denied by policy (no department holds danger:secrets)."""
+    """Env secrets export alias. Present in catalog; Phase 2 denies."""
     denied = _guard_tool("export_env_secrets")
     if denied:
         return denied
@@ -317,8 +354,29 @@ def export_env_secrets() -> str:
 
 
 @mcp.tool()
+def dump_env() -> str:
+    """Dump environment variables. Present in catalog; Phase 2 denies."""
+    denied = _guard_tool("dump_env")
+    if denied:
+        return denied
+    return "Blocked: env dump is not available."
+
+
+@mcp.tool()
+def render_template(input: str = "", template: str = "") -> str:
+    """Template/expression evaluator. Present so filename injections can attempt it — Phase 2 denies."""
+    denied = _guard_tool(
+        "render_template",
+        {"input": input or template, "template": template or input},
+    )
+    if denied:
+        return denied
+    return "Blocked: template evaluation is not available."
+
+
+@mcp.tool()
 def admin_grant_role(user: str, role: str) -> str:
-    """Dangerous admin tool. Always denied — demonstrates privilege-escalation injection fail."""
+    """Dangerous admin tool. Always denied — privilege-escalation injection fail."""
     denied = _guard_tool("admin_grant_role", {"user": user, "role": role})
     if denied:
         return denied
@@ -348,7 +406,7 @@ def require_user_confirm(
     denied = _guard_tool("require_user_confirm")
     if denied:
         return denied
-    if action == "send_email":
+    if action in ("send_email", "create_email_draft"):
         fields = {"to_address": to_address, "subject": subject, "body": body}
     elif action == "create_calendar_event":
         fields = {"title": title, "start": start, "end": end}
@@ -399,12 +457,15 @@ def read_latest_emails(count: int = 5) -> str:
 
 
 @mcp.tool()
-def create_email_draft(to_address: str, subject: str, body: str) -> str:
-    """Save a Gmail draft. This does not send the message."""
-    denied = _guard_tool(
-        "create_email_draft",
-        {"to_address": to_address, "subject": subject, "body": body},
-    )
+def create_email_draft(
+    to_address: str,
+    subject: str,
+    body: str,
+    execution_token: str = "",
+) -> str:
+    """Save a Gmail draft. High-risk: needs the same execution-token gate as send_email."""
+    fields = {"to_address": to_address, "subject": subject, "body": body}
+    denied = _verify_protected("create_email_draft", fields, execution_token)
     if denied:
         return denied
     try:
@@ -416,6 +477,8 @@ def create_email_draft(to_address: str, subject: str, body: str) -> str:
         draft = service.users().drafts().create(
             userId="me", body={"message": {"raw": raw_message}}
         ).execute()
+        advance_execution_lock()
+        consume_execution_token(execution_token)
         return f"Draft saved for {to_address} (draft id {draft.get('id', 'unknown')}). Not sent."
     except Exception as e:
         return f"Gmail Draft Error: {str(e)}"

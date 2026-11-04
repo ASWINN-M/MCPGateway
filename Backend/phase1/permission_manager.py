@@ -133,6 +133,17 @@ def _authorize_resource(identity: dict, tool: str, fields: dict) -> str | None:
         access = str(item.get("access") or "read")
         if tool == "db_insert" and access != "read_write":
             return f"Blocked: table '{table}' is read-only for writes."
+        if tool == "db_query":
+            try:
+                limit = int(fields.get("limit", 20))
+            except (TypeError, ValueError):
+                limit = 20
+            # AgenTRIM-style excessive agency: cap bulk exports even when table is in-policy.
+            if limit > 20 or fields.get("bulk") in (True, "true", "True", 1, "1"):
+                return (
+                    "Blocked: db_query limit exceeds the bulk ceiling (20 rows). "
+                    "Phase 2 rejects oversized exports."
+                )
         return None
 
     if tool == "payment_transfer":
@@ -158,7 +169,16 @@ def _authorize_resource(identity: dict, tool: str, fields: dict) -> str | None:
             return "Blocked: slack_post_message requires channel."
         return None
 
-    if tool in ("run_shell_command", "export_env_secrets", "admin_grant_role"):
+    if tool in (
+        "run_shell",
+        "run_shell_command",
+        "run_command",
+        "export_secrets",
+        "export_env_secrets",
+        "dump_env",
+        "render_template",
+        "admin_grant_role",
+    ):
         return (
             f"Blocked: {tool} is permanently denied by policy "
             "(no department holds the required danger/admin permission)."

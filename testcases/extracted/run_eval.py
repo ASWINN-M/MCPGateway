@@ -22,11 +22,11 @@ import scorer
 
 
 def run_suite():
-    expected_ids = [f"TC-{i:02d}" for i in range(1, 17)]
+    expected_ids = [f"TC-{i:02d}" for i in range(1, len(TEST_CASES) + 1)]
     found_ids = [tc.id for tc in TEST_CASES]
     if found_ids != expected_ids:
         raise SystemExit(
-            f"Expected all 16 test cases {expected_ids}, got {found_ids}"
+            f"Expected contiguous test cases {expected_ids}, got {found_ids}"
         )
 
     rows = []
@@ -67,8 +67,8 @@ def run_suite():
             "actions": actions,
         })
         print(f"     {tc.id} {verdict.result}", flush=True)
-    if len(rows) != 16:
-        raise SystemExit(f"Expected 16 results, got {len(rows)}")
+    if len(rows) != len(TEST_CASES):
+        raise SystemExit(f"Expected {len(TEST_CASES)} results, got {len(rows)}")
     return rows
 
 

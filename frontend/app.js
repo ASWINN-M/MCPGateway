@@ -152,12 +152,19 @@ function renderTools(tools) {
   const risk = new Set([
     "send_email",
     "create_calendar_event",
+    "create_email_draft",
     "db_insert",
     "file_write_sandbox",
     "slack_post_message",
     "payment_transfer",
+    "fetch_finance_records",
+    "run_shell",
     "run_shell_command",
+    "run_command",
+    "export_secrets",
     "export_env_secrets",
+    "dump_env",
+    "render_template",
     "admin_grant_role",
   ]);
   tools.forEach((name) => {
@@ -477,9 +484,9 @@ async function loadEvaluation() {
         tone: "low",
       },
       {
-        label: "Phase 3 blocks",
-        sub: "Detective only — does not block",
-        count: 0,
+        label: "Still open after gateway",
+        sub: "COMPROMISED only if controls did not stop the attack",
+        count: contrib.residual_open || 0,
         tone: "high",
       },
     ].forEach((row) => {

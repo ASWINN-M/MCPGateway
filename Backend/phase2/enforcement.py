@@ -41,6 +41,13 @@ def enforce_tool_request(
             return f"{denied}\n{result['alert']['message']}"
         return denied
 
+    denied = _engine.check_volume_limits(tool, fields, session=session)
+    if denied:
+        result = _audit(user_email, department, tool, "DENIED", session, denied, fields)
+        if result.get("alert"):
+            return f"{denied}\n{result['alert']['message']}"
+        return denied
+
     if require_execution_token or tool in _engine.HIGH_RISK_TOOLS:
         presented = str(execution_token or "").strip().lower()
         if len(presented) != 64:
