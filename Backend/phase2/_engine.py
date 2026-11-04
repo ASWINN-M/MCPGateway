@@ -20,12 +20,35 @@ ALLOWED_TOOLS = [
     "read_salary_record",
     "read_financial_report",
     "read_campaign_insights",
+    "db_list_tables",
+    "db_query",
+    "db_insert",
+    "file_read_sandbox",
+    "file_write_sandbox",
+    "slack_post_message",
+    "payment_transfer",
+    "run_shell_command",
+    "export_env_secrets",
+    "admin_grant_role",
 ]
 
-HIGH_RISK_TOOLS = frozenset({"send_email", "create_calendar_event"})
+HIGH_RISK_TOOLS = frozenset(
+    {
+        "send_email",
+        "create_calendar_event",
+        "db_insert",
+        "file_write_sandbox",
+        "slack_post_message",
+        "payment_transfer",
+    }
+)
 
 _SEND_FIELDS = ("to_address", "subject", "body")
 _EVENT_FIELDS = ("title", "start", "end")
+_DB_INSERT_FIELDS = ("table", "row_json")
+_FILE_WRITE_FIELDS = ("path", "content")
+_SLACK_FIELDS = ("channel", "text")
+_PAYMENT_FIELDS = ("from_account", "to_account", "amount")
 _PLAN_ID_RE = re.compile(r"^[0-9a-f]{16}$")
 _EXECUTION_TOKEN_RE = re.compile(r"^[0-9a-f]{64}$")
 _DEFAULT_TTL_SECONDS = 600
@@ -129,6 +152,14 @@ def _required_fields(action: str) -> tuple[str, ...] | None:
         return _SEND_FIELDS
     if action == "create_calendar_event":
         return _EVENT_FIELDS
+    if action == "db_insert":
+        return _DB_INSERT_FIELDS
+    if action == "file_write_sandbox":
+        return _FILE_WRITE_FIELDS
+    if action == "slack_post_message":
+        return _SLACK_FIELDS
+    if action == "payment_transfer":
+        return _PAYMENT_FIELDS
     return None
 
 
@@ -140,6 +171,7 @@ def canonical_fields(action: str, fields: dict) -> dict[str, str] | str:
     if not isinstance(fields, dict):
         return f"Blocked: {action} confirmation must include {', '.join(required)}."
 
+    optional_empty = {"body", "content", "text", "row_json"}
     normalized: dict[str, str] = {}
     for key in required:
         value = fields.get(key, "")
@@ -148,7 +180,7 @@ def canonical_fields(action: str, fields: dict) -> dict[str, str] | str:
         value = value.strip()
         if key == "to_address":
             value = value.lower()
-        if key != "body" and not value:
+        if key not in optional_empty and not value:
             return (
                 f"Blocked: {action} confirmation must include the exact "
                 f"{', '.join(required)}."

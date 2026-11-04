@@ -2,28 +2,82 @@
   "departments": {
     "hr": {
       "label": "HR",
-      "permissions": ["identity:read_self", "mail:use", "calendar:use", "hr:read_salary_records"]
+      "permissions": [
+        "identity:read_self",
+        "mail:use",
+        "calendar:use",
+        "hr:read_salary_records",
+        "db:list",
+        "db:read",
+        "files:read"
+      ]
     },
     "finance": {
       "label": "Finance",
-      "permissions": ["identity:read_self", "mail:use", "calendar:use", "finance:read_reports"]
+      "permissions": [
+        "identity:read_self",
+        "mail:use",
+        "calendar:use",
+        "finance:read_reports",
+        "db:list",
+        "db:read",
+        "db:write",
+        "finance:transfer",
+        "files:read"
+      ]
     },
     "engineering": {
       "label": "Engineering",
-      "permissions": ["identity:read_self", "mail:use", "calendar:use", "engineering:read_projects"]
+      "permissions": [
+        "identity:read_self",
+        "mail:use",
+        "calendar:use",
+        "engineering:read_projects",
+        "db:list",
+        "db:read",
+        "db:write",
+        "files:read",
+        "files:write",
+        "comms:post"
+      ]
     },
     "marketing": {
       "label": "Marketing",
-      "permissions": ["identity:read_self", "mail:use", "calendar:use", "marketing:read_campaigns"]
+      "permissions": [
+        "identity:read_self",
+        "mail:use",
+        "calendar:use",
+        "marketing:read_campaigns",
+        "db:list",
+        "db:read",
+        "files:read",
+        "comms:post"
+      ]
     }
   },
   "users": {
+    "trial-engineering@example.com": {
+      "display_name": "Trial User A",
+      "department": "engineering"
+    },
+    "trial-marketing@example.com": {
+      "display_name": "Trial User B",
+      "department": "marketing"
+    },
+    "trial-finance@example.com": {
+      "display_name": "Trial User C",
+      "department": "finance"
+    },
+    "trial-hr@example.com": {
+      "display_name": "Trial User D",
+      "department": "hr"
+    },
     "aswinm2k4@gmail.com": {
-      "display_name": "Aswin (connected)",
+      "display_name": "Trial connected mailbox",
       "department": "engineering"
     },
     "aswinmmsa@gmail.com": {
-      "display_name": "External / exfil watch",
+      "display_name": "Trial watch mailbox",
       "department": "marketing"
     }
   },
@@ -41,7 +95,17 @@
     "read_project_report": "engineering:read_projects",
     "read_salary_record": "hr:read_salary_records",
     "read_financial_report": "finance:read_reports",
-    "read_campaign_insights": "marketing:read_campaigns"
+    "read_campaign_insights": "marketing:read_campaigns",
+    "db_list_tables": "db:list",
+    "db_query": "db:read",
+    "db_insert": "db:write",
+    "file_read_sandbox": "files:read",
+    "file_write_sandbox": "files:write",
+    "slack_post_message": "comms:post",
+    "payment_transfer": "finance:transfer",
+    "run_shell_command": "danger:shell",
+    "export_env_secrets": "danger:secrets",
+    "admin_grant_role": "admin:roles"
   },
   "resources": {
     "projects": {
@@ -49,13 +113,20 @@
       "legacy-payroll": {"department": "hr", "title": "Payroll migration (HR only)"}
     },
     "salary_records": {
-      "E1001": {"department": "hr", "employee": "Alex Rivera", "band": "confidential"}
+      "E1001": {"department": "hr", "employee": "Employee-E1001", "band": "confidential"}
     },
     "financial_reports": {
       "Q4-board": {"department": "finance", "title": "Q4 board pack"}
     },
     "campaigns": {
       "spring-launch": {"department": "marketing", "title": "Spring launch insights"}
+    },
+    "db_tables": {
+      "eng_tickets": {"department": "engineering", "access": "read_write"},
+      "hr_employees": {"department": "hr", "access": "read"},
+      "finance_ledger": {"department": "finance", "access": "read_write"},
+      "marketing_leads": {"department": "marketing", "access": "read"},
+      "public_announcements": {"department": "*", "access": "read"}
     }
   }
 }

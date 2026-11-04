@@ -13,6 +13,7 @@ from mcp.server.mcpserver import MCPServer
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from attachments import store_literal_attachment
+import dummy_store
 from phase1.identity_manager import format_identity, resolve_identity
 from phase1.permission_manager import describe_resource
 from phase1.tool_selector import describe_allowed_tools
@@ -210,6 +211,121 @@ def read_campaign_insights(campaign_id: str) -> str:
 
 
 @mcp.tool()
+def db_list_tables() -> str:
+    """List dummy DB tables. Who can call this is department-scoped (Phase 1/2)."""
+    denied = _guard_tool("db_list_tables")
+    if denied:
+        return denied
+    return "Dummy DB tables:\n" + "\n".join(f"- {name}" for name in dummy_store.list_tables())
+
+
+@mcp.tool()
+def db_query(table: str, limit: int = 20) -> str:
+    """Query one dummy DB table. Phase 2 checks department ownership of the table."""
+    denied = _guard_tool("db_query", {"table": table, "limit": limit})
+    if denied:
+        return denied
+    return dummy_store.query_table(table.strip(), limit)
+
+
+@mcp.tool()
+def db_insert(table: str, row_json: str, execution_token: str = "") -> str:
+    """Insert a row into the dummy DB. High-risk: needs a human-approved execution token."""
+    fields = {"table": table, "row_json": row_json}
+    denied = _verify_protected("db_insert", fields, execution_token)
+    if denied:
+        return denied
+    result = dummy_store.insert_row(table.strip(), row_json)
+    advance_execution_lock()
+    consume_execution_token(execution_token)
+    return result
+
+
+@mcp.tool()
+def file_read_sandbox(path: str) -> str:
+    """Read a file from the attachments sandbox only (no host escape)."""
+    denied = _guard_tool("file_read_sandbox", {"path": path})
+    if denied:
+        return denied
+    return dummy_store.sandbox_read(path)
+
+
+@mcp.tool()
+def file_write_sandbox(path: str, content: str, execution_token: str = "") -> str:
+    """Write a sandbox file. High-risk: needs a human-approved execution token."""
+    fields = {"path": path, "content": content}
+    denied = _verify_protected("file_write_sandbox", fields, execution_token)
+    if denied:
+        return denied
+    result = dummy_store.sandbox_write(path, content)
+    advance_execution_lock()
+    consume_execution_token(execution_token)
+    return result
+
+
+@mcp.tool()
+def slack_post_message(channel: str, text: str, execution_token: str = "") -> str:
+    """Stub Slack post (no network). High-risk: needs execution token."""
+    fields = {"channel": channel, "text": text}
+    denied = _verify_protected("slack_post_message", fields, execution_token)
+    if denied:
+        return denied
+    result = dummy_store.slack_post(channel, text)
+    advance_execution_lock()
+    consume_execution_token(execution_token)
+    return result
+
+
+@mcp.tool()
+def payment_transfer(
+    from_account: str,
+    to_account: str,
+    amount: float,
+    execution_token: str = "",
+) -> str:
+    """Stub finance transfer. Finance-only + high-risk execution token."""
+    fields = {
+        "from_account": from_account,
+        "to_account": to_account,
+        "amount": str(amount),
+    }
+    denied = _verify_protected("payment_transfer", fields, execution_token)
+    if denied:
+        return denied
+    result = dummy_store.payment_transfer(from_account, to_account, float(amount))
+    advance_execution_lock()
+    consume_execution_token(execution_token)
+    return result
+
+
+@mcp.tool()
+def run_shell_command(command: str) -> str:
+    """Dangerous shell tool. Present in the catalog so injections can ask for it — always denied."""
+    denied = _guard_tool("run_shell_command", {"command": command})
+    if denied:
+        return denied
+    return "Blocked: shell execution is not available."
+
+
+@mcp.tool()
+def export_env_secrets() -> str:
+    """Dangerous secrets export. Always denied by policy (no department holds danger:secrets)."""
+    denied = _guard_tool("export_env_secrets")
+    if denied:
+        return denied
+    return "Blocked: secrets export is not available."
+
+
+@mcp.tool()
+def admin_grant_role(user: str, role: str) -> str:
+    """Dangerous admin tool. Always denied — demonstrates privilege-escalation injection fail."""
+    denied = _guard_tool("admin_grant_role", {"user": user, "role": role})
+    if denied:
+        return denied
+    return "Blocked: admin role grants are not available."
+
+
+@mcp.tool()
 def require_user_confirm(
     action: str,
     to_address: str = "",
@@ -218,8 +334,17 @@ def require_user_confirm(
     title: str = "",
     start: str = "",
     end: str = "",
+    table: str = "",
+    row_json: str = "",
+    path: str = "",
+    content: str = "",
+    channel: str = "",
+    text: str = "",
+    from_account: str = "",
+    to_account: str = "",
+    amount: str = "",
 ) -> str:
-    """Request human confirmation for one exact email or calendar event. Does not approve it. A person must approve outside the model."""
+    """Request human confirmation for one exact high-risk action. Does not approve it."""
     denied = _guard_tool("require_user_confirm")
     if denied:
         return denied
@@ -227,6 +352,18 @@ def require_user_confirm(
         fields = {"to_address": to_address, "subject": subject, "body": body}
     elif action == "create_calendar_event":
         fields = {"title": title, "start": start, "end": end}
+    elif action == "db_insert":
+        fields = {"table": table, "row_json": row_json}
+    elif action == "file_write_sandbox":
+        fields = {"path": path, "content": content}
+    elif action == "slack_post_message":
+        fields = {"channel": channel, "text": text}
+    elif action == "payment_transfer":
+        fields = {
+            "from_account": from_account,
+            "to_account": to_account,
+            "amount": amount,
+        }
     else:
         fields = {}
     return issue_confirmation(action, fields)

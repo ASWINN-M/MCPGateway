@@ -22,7 +22,10 @@
       </p>
       <div class="cta-row">
         <a class="btn btn-primary" href="#try">Try the live demo</a>
-        <a class="btn btn-ghost" href="#principles">Read the principles</a>
+        <a class="btn btn-ghost" href="#anomaly-panel">Phase 3 anomalies</a>
+        <a class="btn btn-ghost" href="#testrun">Run test suite</a>
+        <a class="btn btn-ghost" href="#evaluation">See evaluation graphs</a>
+        <a class="btn btn-ghost" href="#research">Research benchmarks</a>
       </div>
       <div class="phase-strip" aria-hidden="true">
         <article class="phase-card">
@@ -86,6 +89,9 @@
 
         <div class="box">
           <h3>2. Simulate an LLM tool request (Phase 2)</h3>
+          <p class="chart-note" style="margin-top:-0.4rem">
+            Includes Gmail, dummy DB, Slack stub, payments, shell/secrets (always denied).
+          </p>
           <div class="actions" id="attacks"></div>
           <div class="verdict" id="verdict">Select a persona, then try a tool request.</div>
         </div>
@@ -107,10 +113,166 @@
           <h3>3. Phase 3 audit (this demo session)</h3>
           <div class="log" id="log"><div class="row">No decisions yet.</div></div>
           <p style="margin:0.85rem 0 0;color:var(--muted);font-size:0.9rem">
-            Tip: as Marketing, try Finance/HR tools several times to see a repeated-deny alert.
+            Tip: as Marketing, try Finance/HR tools several times to raise anomaly risk.
           </p>
         </div>
       </div>
+
+      <div class="box" style="margin-top:1.25rem" id="anomaly-panel">
+        <h3>Phase 3 anomaly detection (Isolation Forest)</h3>
+        <p class="chart-note" id="anomaly-principle">
+          Phase 2 checks permission. Phase 3 scores behavioral patterns — including allowed but suspicious bursts.
+        </p>
+        <div class="eval-headline" id="anomaly-headline"></div>
+        <div class="grid-2">
+          <div>
+            <h3 style="font-size:0.95rem">Session behavioral features</h3>
+            <div class="chart" id="anomaly-features"></div>
+          </div>
+          <div>
+            <h3 style="font-size:0.95rem">Risk response legend</h3>
+            <div id="anomaly-legend" class="measure-list"></div>
+            <h3 style="font-size:0.95rem;margin-top:1rem">Recent anomaly events</h3>
+            <div class="log" id="anomaly-log"><div class="row">No anomaly events yet.</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="testrun">
+    <div class="wrap">
+      <p class="eyebrow">Harness for visitors</p>
+      <h2>Prompt → Cursor path → test result</h2>
+      <p class="sub" id="testrun-note">
+        Each test has a default prompt meant for Cursor&apos;s LLM. Copy it into Cursor, or run it
+        here with a local stand-in. No Gmail send; names/emails stay hidden.
+      </p>
+
+      <div class="grid-2">
+        <div class="box">
+          <h3>1. Default system prompt (for Cursor)</h3>
+          <p class="chart-note" id="cursor-note">Guides the LLM. Gateway still enforces in code.</p>
+          <textarea id="system-prompt" class="prompt-box" rows="10" spellcheck="false"></textarea>
+        </div>
+        <div class="box">
+          <h3>2. User / attack prompt</h3>
+          <p class="chart-note">Pick a test case to load its default prompt, or edit freely.</p>
+          <label class="field-label" for="prompt-case">Test case</label>
+          <select id="prompt-case" class="prompt-select"></select>
+          <textarea id="user-prompt" class="prompt-box" rows="10" spellcheck="false"></textarea>
+          <div class="testrun-controls" style="margin-top:0.85rem;margin-bottom:0">
+            <button type="button" class="btn btn-primary" id="btn-run-prompt">Run from this prompt</button>
+            <button type="button" class="btn btn-ghost" id="btn-copy-cursor">Copy for Cursor</button>
+            <span class="testrun-status" id="prompt-run-status">Ready.</span>
+          </div>
+          <div class="verdict" id="prompt-verdict">Select a case, then run from the prompt.</div>
+        </div>
+      </div>
+
+      <div class="testrun-controls" style="margin-top:1.25rem">
+        <button type="button" class="btn btn-primary" id="btn-run-compare">Run all prompts (before vs after)</button>
+        <button type="button" class="btn btn-ghost" id="btn-run-before">All before only</button>
+        <button type="button" class="btn btn-ghost" id="btn-run-after">All after only</button>
+        <span class="testrun-status" id="testrun-status">Ready.</span>
+      </div>
+
+      <div class="eval-headline" id="testrun-headline" aria-live="polite"></div>
+
+      <div class="box" style="margin-bottom:1.25rem">
+        <h3>Test case catalog</h3>
+        <p class="chart-note">Click a row to load that case&apos;s default Cursor prompt.</p>
+        <div class="tc-table-wrap">
+          <table class="tc-table" id="tc-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Category</th>
+                <th>Description</th>
+                <th>Attacker goal</th>
+                <th>Before</th>
+                <th>After</th>
+              </tr>
+            </thead>
+            <tbody id="tc-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="box">
+        <h3>Live run log</h3>
+        <div class="log" id="testrun-log"><div class="row">No run yet. Load a prompt and click Run from this prompt.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="evaluation">
+    <div class="wrap">
+      <p class="eyebrow">Evaluation</p>
+      <h2>Before vs after security layers</h2>
+      <p class="sub" id="eval-metric">
+        Attack Success Rate (ASR) on the 16-attack suite. Lower is better.
+        Charts compare no security vs each phase stack — names and emails stay hidden.
+      </p>
+
+      <div class="eval-headline" id="eval-headline" aria-live="polite"></div>
+
+      <div class="grid-2 eval-charts">
+        <div class="box">
+          <h3>Overall ASR — security off vs on</h3>
+          <p class="chart-note">Undefended baseline vs full three-phase gateway.</p>
+          <div class="chart" id="chart-before-after" role="img" aria-label="Before versus after ASR bar chart"></div>
+        </div>
+        <div class="box">
+          <h3>ASR as each layer is added</h3>
+          <p class="chart-note">None → Phase 1 → Phase 1+2 → Full stack (P1+P2+P3).</p>
+          <div class="chart" id="chart-layers" role="img" aria-label="Per-layer ASR bar chart"></div>
+        </div>
+      </div>
+
+      <div class="grid-2 eval-charts" style="margin-top:1.25rem">
+        <div class="box">
+          <h3>Who stops the attacks?</h3>
+          <p class="chart-note">Primary preventive layer for each SAFE case after the gateway.</p>
+          <div class="chart" id="chart-contribution" role="img" aria-label="Layer contribution chart"></div>
+          <p class="chart-note" id="phase3-note"></p>
+        </div>
+        <div class="box">
+          <h3>Per-attack before / after</h3>
+          <p class="chart-note">Green = SAFE, red = COMPROMISED. Layer badge = primary defense.</p>
+          <div class="case-grid" id="case-grid"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="research">
+    <div class="wrap">
+      <p class="eyebrow">Research landscape</p>
+      <h2>Benchmarks &amp; safety measures</h2>
+      <p class="sub" id="research-caveat">
+        Compare targeted ASR against AgentDojo and InjecAgent published figures, then map our
+        gateway controls to current MCP security research. Suites differ — same metric family only.
+      </p>
+
+      <div class="box" style="margin-bottom:1.25rem">
+        <h3>Targeted ASR across research systems</h3>
+        <p class="chart-note">Lower is better. Highlighted rows are this project.</p>
+        <div class="chart" id="chart-research" role="img" aria-label="Research ASR comparison chart"></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="box">
+          <h3>Papers &amp; systems currently in this space</h3>
+          <div class="paper-list" id="paper-list"></div>
+        </div>
+        <div class="box">
+          <h3>Our safety measures vs research analogues</h3>
+          <div class="measure-list" id="measure-list"></div>
+        </div>
+      </div>
+
+      <div class="takeaways" id="research-takeaways"></div>
     </div>
   </section>
 

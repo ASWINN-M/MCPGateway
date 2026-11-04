@@ -20,9 +20,28 @@ GATEWAY_TOOL_CATALOG: list[str] = [
     "read_salary_record",
     "read_financial_report",
     "read_campaign_insights",
+    "db_list_tables",
+    "db_query",
+    "db_insert",
+    "file_read_sandbox",
+    "file_write_sandbox",
+    "slack_post_message",
+    "payment_transfer",
+    "run_shell_command",
+    "export_env_secrets",
+    "admin_grant_role",
 ]
 
-HIGH_RISK_TOOLS = frozenset({"send_email", "create_calendar_event"})
+HIGH_RISK_TOOLS = frozenset(
+    {
+        "send_email",
+        "create_calendar_event",
+        "db_insert",
+        "file_write_sandbox",
+        "slack_post_message",
+        "payment_transfer",
+    }
+)
 
 
 def allowed_tool_set(user_email: str) -> set[str] | str:

@@ -141,33 +141,44 @@ Downstream tools must not be reachable by bypassing the gateway where the host a
 
 ---
 
-## Phase 3 — Post-execution monitoring and auditing
+## Phase 3 — Monitoring and anomaly detection
 
 ### Purpose
 
-Detective layer: record authorization decisions and outcomes, spot suspicious patterns (e.g. repeated DENY on out-of-department tools), support investigation. **Cannot undo** a successful tool call — Phase 2 must block first.
+Detective layer: record authorization decisions and outcomes, and identify **suspicious behavior that may still be individually permitted**. **Cannot undo** a successful tool call — Phase 2 must block first.
+
+Key distinction:
+
+- **Phase 2** checks whether an action is *permitted*.
+- **Phase 3** checks whether the *activity pattern* looks suspicious (volume bursts, repeated unauthorized attempts, unusual sensitive-action rates), even when single calls are ALLOWED.
 
 ### How it works
 
-1. **Collect execution information** — user, department, tool, allow/deny, timestamp, session (no raw secrets in logs).  
-2. **Monitor activity** — unusual volume, repeated unauthorized tools, odd sequences.  
-3. **Detect suspicious activity** — e.g. Marketing: `read_email` SUCCESS then many DENY on Finance/HR tools.  
-4. **Alerts and reports** — flag session, notify admin, recommend revocation (harness-side guarantees + future audit log files).
+1. **Collect tool execution logs** — user/persona, department, tool, allow/deny, timestamp, session (no email bodies, passwords, or tokens).  
+2. **Extract behavioral features** — e.g. tool calls/minute, failed authorizations, unique tools, department-mismatch attempts, sensitive-action counts.  
+3. **Detect unusual patterns** — Isolation Forest trained on representative *normal* behavior (plus calm historical sessions), not on labelled attacks.  
+4. **Generate risk scores** — low / medium / high / critical with recommended responses (record, alert, require verification, recommend suspend).  
+5. **Alert without bypassing Phase 2** — Phase 3 advises protective action; it does not silently override the gateway.
+
+Rejected Phase 2 requests are also sent to Phase 3: repeated unauthorized attempts are themselves a signal.
 
 ### What Phase 3 achieves
 
-- Visibility into tool usage  
-- Detection of suspicious call patterns  
+- Visibility into tool usage beyond allow/deny  
+- Detection of high-volume or probing patterns that policy alone would allow  
+- Risk-based admin guidance  
 - Audit trail for faculty / incident review  
-- Evidence that the gateway is denying as designed  
 
 ### Implemented as
 
 | Component | Code / artifacts |
 | --- | --- |
-| Audit / eval trail | `results/after_gateway.json`, harness action logs |
+| SQLite + JSONL audit | `Backend/phase3/audit_store.py`, `results/audit/` |
+| Feature extraction | `Backend/phase3/features.py` |
+| Isolation Forest + heuristics | `Backend/phase3/anomaly_detector.py` |
+| Risk engine | `Backend/phase3/risk_engine.py` |
+| Monitoring facade | `Backend/phase3/monitoring.py` |
 | Security guarantees | `testcases/extracted/security_guarantees.py` (SG-01…SG-12) |
-| Monitoring Engine | Pattern checks in guarantees + scored ASR reports (full SIEM-style alerting is optional future work) |
 
 ---
 

@@ -118,6 +118,52 @@ def _authorize_resource(identity: dict, tool: str, fields: dict) -> str | None:
             )
         return None
 
+    if tool in ("db_query", "db_insert"):
+        table = str(fields.get("table", "")).strip()
+        catalog = resources.get("db_tables") or {}
+        item = catalog.get(table)
+        if not item:
+            return f"Blocked: unknown db table '{table}'."
+        owner = str(item.get("department") or "")
+        if owner != "*" and owner != department:
+            return (
+                f"Blocked: table '{table}' belongs to {owner}, not {department}. "
+                "Dummy DB enforces department ownership."
+            )
+        access = str(item.get("access") or "read")
+        if tool == "db_insert" and access != "read_write":
+            return f"Blocked: table '{table}' is read-only for writes."
+        return None
+
+    if tool == "payment_transfer":
+        # Finance-only permission already checked; require non-empty accounts.
+        if not str(fields.get("from_account", "")).strip() or not str(fields.get("to_account", "")).strip():
+            return "Blocked: payment_transfer requires from_account and to_account."
+        try:
+            amount = float(fields.get("amount", 0))
+        except (TypeError, ValueError):
+            return "Blocked: payment_transfer amount must be numeric."
+        if amount <= 0:
+            return "Blocked: payment_transfer amount must be positive."
+        return None
+
+    if tool in ("file_read_sandbox", "file_write_sandbox"):
+        path = str(fields.get("path", "")).strip()
+        if not path or ".." in path.replace("\\", "/").split("/"):
+            return "Blocked: sandbox path must be a simple filename (no '..')."
+        return None
+
+    if tool == "slack_post_message":
+        if not str(fields.get("channel", "")).strip():
+            return "Blocked: slack_post_message requires channel."
+        return None
+
+    if tool in ("run_shell_command", "export_env_secrets", "admin_grant_role"):
+        return (
+            f"Blocked: {tool} is permanently denied by policy "
+            "(no department holds the required danger/admin permission)."
+        )
+
     return None
 
 

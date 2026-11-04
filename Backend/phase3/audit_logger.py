@@ -2,13 +2,9 @@
 
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
-from pathlib import Path
 
-_PROJECT = Path(__file__).resolve().parents[2]
-_AUDIT_DIR = _PROJECT / "results" / "audit"
-_AUDIT_FILE = _AUDIT_DIR / "tool_decisions.jsonl"
+from .audit_store import append_decision, recent_decisions as _store_recent
 
 
 def log_decision(
@@ -20,6 +16,7 @@ def log_decision(
     session_id: str,
     reason: str = "",
     arguments_keys: list[str] | None = None,
+    sensitive: bool = False,
 ) -> dict:
     record = {
         "user_id": user_id,
@@ -31,22 +28,8 @@ def log_decision(
         "reason": reason[:300],
         "argument_keys": list(arguments_keys or []),
     }
-    _AUDIT_DIR.mkdir(parents=True, exist_ok=True)
-    with _AUDIT_FILE.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(record, ensure_ascii=True) + "\n")
-    return record
+    return append_decision(record, sensitive=sensitive)
 
 
 def recent_decisions(limit: int = 200) -> list[dict]:
-    if not _AUDIT_FILE.is_file():
-        return []
-    lines = _AUDIT_FILE.read_text(encoding="utf-8").splitlines()
-    out: list[dict] = []
-    for line in lines[-limit:]:
-        try:
-            item = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(item, dict):
-            out.append(item)
-    return out
+    return _store_recent(limit)
