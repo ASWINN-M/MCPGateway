@@ -21,6 +21,8 @@ See [architecture.md](architecture.md) for the full mailbox model.
 
 Optional: [uv](https://docs.astral.sh/uv/) (`pyproject.toml` / `uv.lock` are included)
 
+For Phase 3 Isolation Forest in the UI: `scikit-learn` and `numpy` (install into `.venv` if missing).
+
 ---
 
 ## 1. Clone
@@ -52,6 +54,8 @@ python -m venv .venv
 source .venv/bin/activate
 
 pip install -e .
+# Phase 3 anomaly (if not already pulled in):
+pip install scikit-learn numpy
 ```
 
 ---
@@ -87,7 +91,7 @@ If you skip test users you get: `Error 403: access_denied`.
 
 ## 6. Desktop OAuth client → `credentials.json`
 
-1. [Credentials](https://console.cloud.google.com/apis/credentials) → **Create credentials** → **OAuth client ID**.  
+1. [Credentials](https://console.cloud.google.com/auth/credentials) → **Create credentials** → **OAuth client ID**.  
 2. Type: **Desktop app**.  
 3. Download JSON → rename to `credentials.json`.  
 4. Place it in the **project root** (next to `pyproject.toml`).
@@ -140,7 +144,7 @@ You should see recent inbox subjects, then the process exits.
 
 ## 9. Connect Cursor (LLM)
 
-1. Edit `.cursor/mcp.json` so paths match **your** machine:
+1. Edit `.cursor/mcp.json` so paths match **your** machine. Prefer `launch_stdio.py` so the legitimate client presents `MCP_CALLER_TOKEN`:
 
 ```json
 {
@@ -148,8 +152,7 @@ You should see recent inbox subjects, then the process exits.
     "gmail": {
       "command": "C:\\path\\to\\Security\\.venv\\Scripts\\python.exe",
       "args": [
-        "C:\\path\\to\\Security\\Backend\\email_server.py",
-        "--stdio"
+        "C:\\path\\to\\Security\\Backend\\launch_stdio.py"
       ]
     }
   }
@@ -163,6 +166,17 @@ Cursor starts the server with `--stdio`. You do not need to keep a separate term
 
 ---
 
+## 10. Explainer UI (optional)
+
+```powershell
+cd C:\Capstone\Security
+.\.venv\Scripts\python.exe frontend\server.py
+```
+
+Open http://127.0.0.1:8760 — Phase 1–3 playground, evaluation charts, prompt-driven test run, anomaly view. Trial personas only; UI does not send real mail.
+
+---
+
 ## Troubleshooting
 
 | Problem | Fix |
@@ -172,6 +186,8 @@ Cursor starts the server with `--stdio`. You do not need to keep a separate term
 | Missing OAuth client file | Put `credentials.json` in project root |
 | Cursor has no tools | Fix `mcp.json` paths; enable **gmail**; reload Cursor |
 | Calendar / drafts fail after old login | Delete `token.json`, run `--login` again |
-| `send_email` blocked | Approve via `require_user_confirm`, then retry with `confirm_token` |
+| `send_email` blocked | Approve via `require_user_confirm` / CLI `--approve`, then retry with `execution_token` |
+| Anomaly API / sklearn errors | `pip install scikit-learn numpy` into `.venv` |
+| Port 8760 in use | Stop other `frontend\server.py` processes |
 
 Next: [tools-and-usage.md](tools-and-usage.md) or [architecture.md](architecture.md).

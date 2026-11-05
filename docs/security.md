@@ -6,8 +6,9 @@
 | --- | --- | --- |
 | `credentials.json` | Google OAuth client id/secret | **No** |
 | `token.json` | Session for **connected** account (`aswinm2k4@gmail.com`) | **No** |
-| `.env` | Optional local env | **No** |
+| `.env` | Optional local env / gateway secrets | **No** |
 | `.env.example` | Placeholders only | Yes |
+| `approvals/` | Plans, execution-token hashes, locks | Local (do not commit secrets) |
 
 Treat `token.json` like a password for the connected mailbox.
 
@@ -15,18 +16,19 @@ Treat `token.json` like a password for the connected mailbox.
 
 ## Working principles (controls)
 
-Implemented in `Backend/`:
+Implemented under `Backend/phase1`–`phase3` and `email_server.py`:
 
-1. **Allowlist** — only tools in `gateway.py`  
-2. **Confirmation** — `send_email` / `create_calendar_event` need `require_user_confirm`  
-3. **Draft ≠ send**  
-4. **Own calendar only** — no guests / external share  
-5. **Literal filenames** — no template evaluation  
-6. **Narrow OAuth scopes** — Gmail read/compose/send + calendar events  
-
-Not implemented yet (honest gap):
-
-- **TC-05** — authentication of local/stdio callers (`MCP_CALLER_TOKEN` style)
+1. **Phase 1 least exposure** — `list_allowed_tools` filtered by trusted department  
+2. **Phase 2 enforcement** — every tool through `_guard_tool` / authorization  
+3. **Caller / session auth** — `MCP_CALLER_TOKEN` via `launch_stdio.py`  
+4. **Confirmation** — high-risk writes need human `--approve` + bound execution token  
+5. **Draft ≠ send** — drafts also gated on the hardened path  
+6. **Own calendar only** — no guests / external share  
+7. **Literal filenames** — `store_attachment`; `render_template` denied  
+8. **Bulk / rate ceilings** — `db_query` row limits; mailbox read throttling  
+9. **Danger catalog present + denied** — shell / secrets / admin / template (`danger:*`)  
+10. **Phase 3 audit + anomaly** — JSONL/SQLite + Isolation Forest risk levels  
+11. **Narrow OAuth scopes** — Gmail read/compose/send + calendar events  
 
 ---
 
@@ -45,11 +47,12 @@ A **SAFE** harness result for send-based attacks means the gateway blocked deliv
 
 | Claim | OK? |
 | --- | --- |
-| Real gateway ASR from `compare_before_after.py` | Yes |
-| Mock 100% / 0% ASR as product result | **No** (label as mock) |
-| “TC-05 passed” | **No** until caller auth exists |
+| Real gateway ASR from a `real` harness run | Yes (label `target_mode=real`) |
+| Mock 100% → 0% ASR as a **demo** of Phase 1–2 | Yes if labeled **mock** |
+| Mock ASR as the sole “product” production result | **No** without labeling |
+| “Tools unavailable, so we are safe” | **No** — tools exist; policy denies |
 | “We patched Claude/Google/Hugging Face CVEs” | **No** — same *risk classes*, different product |
-| Allowlist + confirm exist | Yes |
+| Allowlist + confirm + Phase 3 monitoring exist | Yes |
 
 ---
 
@@ -57,10 +60,12 @@ A **SAFE** harness result for send-based attacks means the gateway blocked deliv
 
 If the agent sees TC ids or `attack_generator.py`, you are testing exam recognition, not mechanism resistance. Keep attack metadata out of prompts and out of `Backend/`.
 
+Trial UI scrubbing: avoid leaking real Gmail addresses / personal names into evaluation payloads shown to visitors.
+
 ---
 
 ## Related docs
 
 - [architecture.md](architecture.md) — principles and diagrams  
 - [testing.md](testing.md) — how to measure  
-- [scores_real_gateway.md](scores_real_gateway.md) — latest numbers  
+- [scores_before_after_gateway.md](scores_before_after_gateway.md) — latest numbers  

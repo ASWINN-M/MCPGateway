@@ -1,15 +1,15 @@
 # MCP Security Gateway
 
-Least-privilege MCP bridge between **Cursor’s LLM** and **Gmail + Google Calendar**.
+Least-privilege **three-phase** MCP bridge between **Cursor’s LLM** and **Gmail + Google Calendar**, plus department stubs, dummy DB/file/comms tools, and a catalog of high-risk tools that exist so injections can attempt them — Phase 2 denies them in code.
 
-The model can read mail, save drafts, send mail (with confirmation), check your calendar, create events on **your** calendar only (with confirmation), and store attachments as **literal** filenames. Finance, payroll, passwords, and shell access are not exposed.
-
-**Working principle:** three phases — (1) expose only department-permitted tools, (2) gateway allow/deny before execution, (3) audit and detect abuse. The prompt guides; the gateway enforces.
+**Working principle:** (1) expose only department-permitted tools, (2) allow/deny before execution (permissions, args, confirmation tokens, rate/bulk ceilings), (3) audit + Isolation Forest anomaly detection. The prompt guides; the gateway enforces.
 
 | Role | Address |
 | --- | --- |
-| Connected / attacking mail (OAuth) | `x@gmail.com` |
-| Exfil / attacked inbox (watch) | `y@gmail.com` |
+| Connected / attacking mail (OAuth) | `aswinm2k4@gmail.com` |
+| Exfil / attacked inbox (watch) | `aswinmmsa@gmail.com` |
+
+Trial personas for the explainer UI use `@example.com` (no real names/emails in the visitor surface).
 
 ---
 
@@ -19,13 +19,14 @@ The model can read mail, save drafts, send mail (with confirmation), check your 
 | --- | --- |
 | [docs/overview.md](docs/overview.md) | What / why / principles |
 | [docs/setup.md](docs/setup.md) | Clone → OAuth → Cursor |
-| [docs/architecture.md](docs/architecture.md) | Three-phase architecture (selection → enforcement → monitoring) |
-| [docs/tools-and-usage.md](docs/tools-and-usage.md) | Tools, CLI, chat |
-| [docs/testing.md](docs/testing.md) | 16-attack harness |
-| [docs/scores_real_gateway.md](docs/scores_real_gateway.md) | Latest real ASR |
+| [docs/architecture.md](docs/architecture.md) | Three-phase architecture |
+| [docs/tools-and-usage.md](docs/tools-and-usage.md) | Full tool catalog |
+| [docs/testing.md](docs/testing.md) | **21-attack** harness + evaluation UI |
+| [docs/scores_before_after_gateway.md](docs/scores_before_after_gateway.md) | Before vs after ASR |
+| [docs/scores_real_gateway.md](docs/scores_real_gateway.md) | Latest hardened-run detail |
 | [docs/security.md](docs/security.md) | Secrets + reporting honesty |
 
-Index: [`docs/README.md`](docs/README.md). Also [`implementation.md`](implementation.md) / [`test.md`](test.md) point into `docs/`.
+Index: [`docs/README.md`](docs/README.md). Pointers: [`implementation.md`](implementation.md) · [`test.md`](test.md).
 
 ---
 
@@ -33,7 +34,7 @@ Index: [`docs/README.md`](docs/README.md). Also [`implementation.md`](implementa
 
 1. Clone and install (`uv sync` or venv + `pip install -e .`).  
 2. Enable **Gmail API** + **Calendar API**.  
-3. OAuth consent = **Testing**; add `x@gmail.com` as test user.  
+3. OAuth consent = **Testing**; add `aswinm2k4@gmail.com` as test user.  
 4. Desktop OAuth client → `credentials.json` in project root.  
 5. Login **as the connected account**:
 
@@ -48,23 +49,17 @@ Details: [docs/setup.md](docs/setup.md).
 
 ---
 
-## Tools
+## Tools (summary)
 
-| Tool | Confirm? | Notes |
+| Group | Examples | Notes |
 | --- | --- | --- |
-| `get_my_identity` | No | Trusted directory department |
-| `list_allowed_tools` | No | Filtered by department |
-| `require_user_confirm` | No | Starts approval plan |
-| `read_latest_emails` | No | Needs `mail:use` |
-| `create_email_draft` | No | |
-| `send_email` | **Yes** | Execution token |
-| `get_calendar_availability` | No | |
-| `create_calendar_event` | **Yes** | Execution token |
-| `store_attachment` | No | Literal filenames |
-| `read_project_report` | No | Engineering only |
-| `read_salary_record` | No | HR only |
-| `read_financial_report` | No | Finance only |
-| `read_campaign_insights` | No | Marketing only |
+| Identity | `get_my_identity`, `list_allowed_tools` | Trusted directory department |
+| Mail / calendar | `read_latest_emails`, `create_email_draft`, `send_email`, calendar tools | High-risk writes need execution token |
+| Dept stubs | `read_project_report`, `read_salary_record`, `read_financial_report`, `read_campaign_insights` | Department-gated |
+| Dummy enterprise | `db_*`, `file_*_sandbox`, `slack_post_message`, `payment_transfer` | Policy + confirm where high-risk |
+| Attack-surface (catalog present) | `fetch_finance_records`, `run_shell`, `export_secrets`, `render_template`, `admin_grant_role` | **Present so attacks can try them**; Phase 2 denies (`danger:*` / wrong dept) |
+
+Full table: [docs/tools-and-usage.md](docs/tools-and-usage.md).
 
 ---
 
@@ -75,54 +70,63 @@ Details: [docs/setup.md](docs/setup.md).
 | `python Backend/email_server.py --login` | Create `token.json` |
 | `python Backend/email_server.py` | Print inbox |
 | `python Backend/email_server.py --stdio` | MCP for Cursor / harness |
-| `python Backend/email_server.py --serve` | Optional HTTP MCP |
+| `python Backend/email_server.py --approve <plan_id>` | Human approval → execution token |
+| `python frontend/server.py` | Explainer UI + live Phase 1–3 playground |
 
 ---
 
-## Testing (real gateway, all 16 cases)
+## Testing (21 cases)
+
+Mock before/after (deterministic demo ASR):
+
+```powershell
+$env:MCP_HARNESS_TARGET='mock_vulnerable'
+.\.venv\Scripts\python.exe testcases\extracted\run_eval.py --label before --out results\before_gateway.json --allow-mock
+$env:MCP_HARNESS_TARGET='mock_hardened'
+.\.venv\Scripts\python.exe testcases\extracted\run_eval.py --label after --out results\after_gateway.json --allow-mock
+.\.venv\Scripts\python.exe testcases\extracted\layer_eval.py
+```
+
+Real gateway (no mock):
 
 ```powershell
 cd testcases\extracted
 Remove-Item Env:MCP_HARNESS_TARGET -ErrorAction SilentlyContinue
-C:\Capstone\Security\.venv\Scripts\python.exe compare_before_after.py
+..\..\.venv\Scripts\python.exe compare_before_after.py
 ```
 
-- Default: **real MCP only** (no mock)  
-- From = `x@gmail.com` · exfil To = `y@gmail.com`  
-- Writes `docs/scores_real_gateway.md` + `results/after_gateway.json`  
-
-Optional mock baseline: `python compare_before_after.py --with-baseline`
+Current mock baseline in-repo: **before ASR 100% → after ASR 0%** on TC-01…TC-21 (SAFE via Phase 2 deny of present tools, not “tool missing”).
 
 ---
 
-## Explainer UI (for demos / faculty)
+## Explainer UI
 
-Shows Phase 1–3 principles with a live allow/deny playground (uses `policy.json`; does not send real mail):
+Phase 1–3 playground, evaluation charts, prompt-driven test run, anomaly view. Uses trial personas; does not embed Cursor’s LLM or send real mail from the UI:
 
 ```powershell
-cd C:\Capstone\Security
 .\.venv\Scripts\python.exe frontend\server.py
 ```
 
 Open http://127.0.0.1:8760
+
+---
 
 ## Layout
 
 ```text
 Security/
   README.md
-  docs/                     three-phase architecture, testing, scores
-  frontend/                 visitor explainer UI + local server
+  docs/                     architecture, testing, scores
+  frontend/                 visitor explainer UI (:8760)
   Backend/
     phase1/                 identity, permissions, tool selection
     phase2/                 session, tokens, approval, enforcement
-    phase3/                 audit log, anomaly detection, monitoring
+    phase3/                 audit, Isolation Forest anomaly, monitoring
     email_server.py         MCP tool surface
-    launch_stdio.py
+    dummy_store.py          sandbox DB/files stubs
     policy.json
-    gateway.py / policy.py  compatibility shims
-  testcases/extracted/      16-attack harness + guarantees
-  results/                  scores + audit/
+  testcases/extracted/      21-attack harness + guarantees
+  results/                  before/after/evaluation JSON + audit/
   .cursor/mcp.json
 ```
 
@@ -131,7 +135,7 @@ Security/
 ## Security
 
 - Never commit `credentials.json` or `token.json`.  
-- Do not claim TC-05 SAFE without caller auth.  
-- Do not report mock ASR as the product result.  
+- Label mock ASR as mock; do not claim product “CVE patches.”  
+- Dangerous tools are **in catalog** and **denied** — SAFE ≠ missing tool.
 
 More: [docs/security.md](docs/security.md) · [docs/architecture.md](docs/architecture.md).
